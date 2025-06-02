@@ -1,1 +1,1 @@
-import mydatalab.lab_tools
+import lab_tools
