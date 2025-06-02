@@ -7,8 +7,7 @@ setup(
     author="Ferd",
     packages=find_packages(),
     install_requires=[
-        "pandas",
-        "numpy"
+        "pandas"
     ],
     python_requires=">=3.7",
 )
