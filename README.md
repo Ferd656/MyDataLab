@@ -1,11 +1,11 @@
 # mydatalab
 
-A data ETL utility library.
+a GUI workbench
 
 ## Installation
 
 ```bash
-pip install git+https://github.com/yourusername/mydatalab.git
+pip install git+https://github.com/Ferd656/mydatalab.git
 ```
 
 ## Usage
