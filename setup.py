@@ -6,6 +6,8 @@ setup(
     description="Utility panel with graphical interface",
     author="Ferd",
     packages=find_packages(),
-    install_requires=[],
+    install_requires=[
+        "pandas"
+    ],
     python_requires=">=3.7",
 )
