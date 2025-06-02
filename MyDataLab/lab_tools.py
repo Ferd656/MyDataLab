@@ -14,7 +14,6 @@ def extract_date(text):
     match = re.search(r'\d{4}-\d{2}-\d{2}', text)
     return match.group(0) if match else None
 
-
 def etl(database_connection, table_name, column_map, period=None, period_col="DATE", delimiter='\t'):
     """
     Default ETL process.
@@ -26,7 +25,7 @@ def etl(database_connection, table_name, column_map, period=None, period_col="DA
         for _, (new_name, _, sqlite_type) in column_map.items()
     ]
     if period is not None:
-        columns_sql.append("PERIODO DATE")
+        columns_sql.append(f"{period_col} DATE")
     columns_sql_str = ", ".join(columns_sql)
 
     # Initialize the table
@@ -36,18 +35,24 @@ def etl(database_connection, table_name, column_map, period=None, period_col="DA
             {columns_sql_str}
         )
     """)
-
+    #------------------------------------------------
+    datafolder = DATASOURCE_PATH + f"\\{table_name}"
+    os.makedirs(datafolder, exist_ok=True)
     files = glob.glob(
-        os.path.join(DATASOURCE_PATH + f"\\{table_name}", '*.csv')
+        os.path.join(datafolder, '*.csv')
         ) + glob.glob(
-        os.path.join(DATASOURCE_PATH + f"\\{table_name}", '*.txt')
+        os.path.join(datafolder, '*.txt')
         )
-    
+    #------------------------------------------------
     dataframes = []
-
     for f in files:
         try:
-            df_temp = pd.read_csv(f, delimiter=delimiter, encoding='utf-8')
+            df_temp = pd.read_csv(
+                f,
+                delimiter=delimiter,
+                encoding='utf-8',
+                dtype={col: dtype for col, (_, dtype, _) in column_map.items()}
+            )
         except UnicodeDecodeError:
             print(f"Warning: File '{f}' is not UTF-8 encoded. Skipping.")
             continue
@@ -56,21 +61,23 @@ def etl(database_connection, table_name, column_map, period=None, period_col="DA
             continue  # Skip this file if DataFrame is empty
         df_temp = df_temp.rename(columns={col: new_name for col, (new_name, _, _) in column_map.items()})
         df_temp = df_temp[sorted(df_temp.columns)]
-        df_temp = df_temp.astype({col: dtype for col, (_, dtype, _) in column_map.items() if col in df_temp.columns})
         if period == 'filename':
             df_temp[period_col] = extract_date(os.path.basename(f))
         dataframes.append(df_temp)
+    #------------------------------------------------
+    if dataframes:
+        df = pd.concat(dataframes, ignore_index=True)
+        periodos = df[period_col].unique().tolist() if period_col in df.columns else []
 
-    df = pd.concat(dataframes, ignore_index=True)
-    periodos = df[period_col].unique().tolist() if period_col in df.columns else []
+        if periodos:
+            warnings.warn(f"Warning: The following {period_col} values will be replaced in the database: {periodos}")
+            placeholders = ','.join('?' for _ in periodos)
+            cur.execute(f"DELETE FROM {table_name} WHERE {period_col} IN ({placeholders})", periodos)
 
-    if periodos:
-        warnings.warn(f"Warning: The following {period_col} values will be replaced in the database: {periodos}")
-        placeholders = ','.join('?' for _ in periodos)
-        cur.execute(f"DELETE FROM {table_name} WHERE {period_col} IN ({placeholders})", periodos)
+        df.to_sql(table_name, database_connection, if_exists='append', index=False)
 
-    df.to_sql(table_name, database_connection, if_exists='append', index=False)
-
-    database_connection.commit()
-
+        database_connection.commit()
+    else:
+        warnings.warn(f"Warning: Data for {table_name} not found.")
+    #------------------------------------------------
     print("ETL finished successfully.")
