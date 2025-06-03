@@ -1,6 +1,6 @@
 # mydatalab
 
-a GUI workbench
+a General-purpose workbench
 
 ## Installation
 
